@@ -9,3 +9,7 @@ __pycache__/
 .gitignore
 venv/
 .envrc
+data/
+output/
+db/
+www/

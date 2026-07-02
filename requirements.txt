@@ -1,1 +1,4 @@
-# No runtime dependencies for the minimal example
+# Runtime dependencies
+Pillow>=9.0.0
+Jinja2>=3.0
+

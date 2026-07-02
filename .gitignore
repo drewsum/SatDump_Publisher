@@ -16,3 +16,10 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+# Generated outputs from satdump_publisher
+output/
+db/
+www/
+image_map.json
+*.db
+*.sqlite

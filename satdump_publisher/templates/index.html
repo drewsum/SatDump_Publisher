@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SatDump Publisher - Gallery</title>
+    <link rel="stylesheet" href="static/style.css">
+  </head>
+  <body>
+    <header>
+      <h1>SatDump Publisher - Gallery</h1>
+      <p>Found {{ images|length }} image(s)</p>
+    </header>
+    <main>
+      <ul class="gallery">
+      {% for img in images %}
+        <li>
+          <a href="{{ img.path }}"><img alt="{{ img.path }}" src="thumbs/{{ loop.index0 }}.jpg"></a>
+          <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
+        </li>
+      {% endfor %}
+      </ul>
+    </main>
+  </body>
+</html>

@@ -37,7 +37,17 @@ docker run --rm satdump-publisher --message "Hello from container"
 Docker Compose
 --------------
 
-Run using Docker Compose (binds `./data` to `/data` in container):
+Run using Docker Compose:
+
+- Mount your incoming data into the container at `/data/input` (read-only). Example host path used in the compose file: `Z:\drewsum\SatDump\live_output`.
+- The container will write DB and generated site into `/data`, which is bound to the repository `./output` folder, so the generated site will appear at `./output/www` on the host.
+
+Compose maps (example):
+
+```
+Z:\drewsum\SatDump\live_output -> /data/input (read-only)
+./output -> /data
+```
 
 ```bash
 docker compose up --build

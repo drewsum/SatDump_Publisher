@@ -9,6 +9,14 @@ description = "Minimal satdump publisher CLI"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{name = "Drew Maatman"}]
+dependencies = ["Pillow>=9.0.0", "Jinja2>=3.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["satdump_publisher*"]
+
+[tool.setuptools.package-data]
+"satdump_publisher" = ["templates/*", "templates/*/*"]
 
 [project.scripts]
 satdump_publisher = "satdump_publisher.cli:main"
