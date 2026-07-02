@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 import os
 import shutil
-from urllib.parse import quote
 import time
 from typing import List
 
@@ -52,7 +51,6 @@ def extract_image_metadata(path: Path, base: Path, compute_hash: bool = True):
     stat = path.stat()
     rel = str(path.relative_to(base))
     size = stat.st_size
-    # timestamp: try EXIF, else file mtime
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(stat.st_mtime))
     fmt = None
     width = None
@@ -104,27 +102,22 @@ def main():
     parser.add_argument("--output", dest="output_dir", default=None, help="Output dir for generated site (default: <path>/www)")
     parser.add_argument("--no-thumbs", dest="no_thumbs", action="store_true", help="Do not generate thumbnails")
 
-    # allow unknown args (compose may add service name as an extra token)
     args, unknown = parser.parse_known_args()
 
-    # scanning root vs writable data root
     data_root = Path("/data") if Path("/data").exists() else Path.cwd()
     scan_default = Path("/data/input") if Path("/data/input").exists() else data_root
     scan_root = Path(args.path) if args.path else scan_default
     root = scan_root
     exts = [".png", ".jpg", ".jpeg", ".gif"]
 
-    # Always run: scan -> update DB in writable data_root -> generate site
-    db_path = data_root / "db" / "satdump.db"
-    conn = _db.ensure_db(db_path)
+    conn = _db.ensure_db(data_root / "db" / "satdump.db")
     files = find_images(root, exts)
     for p in files:
         meta = extract_image_metadata(p, root, compute_hash=not args.no_hash)
         _db.upsert_image(conn, path=meta["path"], timestamp=meta["timestamp"], format=meta["format"], width=meta["width"], height=meta["height"], size=meta["size"], sha256=meta["sha256"])
         print(f"Indexed: {meta['path']}")
-    print(f"Indexed {len(files)} image(s) into {db_path}")
+    print(f"Indexed {len(files)} image(s) into {data_root / 'db' / 'satdump.db'}")
 
-    # Generate site
     out = Path(args.output_dir) if args.output_dir else (data_root / "www")
     rows = _db.list_images(conn)
     images = []
@@ -138,14 +131,23 @@ def main():
             "size": r[5],
             "sha256": r[6],
         })
-    out.mkdir(parents=True, exist_ok=True)
-    # assign stable thumbnail index for each image
+
+    # prepare generation temp dir
+    out_tmp = out.parent / (out.name + ".tmp")
+    if out_tmp.exists():
+        try:
+            shutil.rmtree(out_tmp)
+        except Exception as e:
+            print(f"warning: could not remove existing tmp dir: {e}")
+    out_tmp.mkdir(parents=True, exist_ok=True)
+
+    # stable thumbnail indices
     for i, img in enumerate(images):
         img["idx"] = i
 
     # thumbnails
     if not args.no_thumbs:
-        thumbs_dir = out / "thumbs"
+        thumbs_dir = out_tmp / "thumbs"
         thumbs_dir.mkdir(exist_ok=True)
         if Image is None:
             print("Pillow not installed; cannot generate thumbnails")
@@ -159,34 +161,32 @@ def main():
                 except Exception as e:
                     print(f"thumb error for {src}: {e}")
 
-    # copy original images into site preserving relative paths so nginx can serve them
-    images_dir = out / "images"
-    # remove any stale copies to ensure sanitized set is authoritative
+    # copy originals
+    images_dir = out_tmp / "images"
     if images_dir.exists():
         try:
             shutil.rmtree(images_dir)
         except Exception as e:
-            print(f"warning: could not remove existing images dir: {e}")
+            print(f"warning: could not remove existing images dir in tmp: {e}")
     images_dir.mkdir(parents=True, exist_ok=True)
+
+    import re
+    def _sanitize(segment: str) -> str:
+        return re.sub(r'[^A-Za-z0-9._-]', '_', segment)
+
     for idx, img in enumerate(images):
         src = root / img["path"]
         try:
             rel = Path(img["path"])  # may include subdirs
-            # sanitize each path segment to safe filename characters
-            import re
-            def _sanitize(segment: str) -> str:
-                return re.sub(r'[^A-Za-z0-9._-]', '_', segment)
-
             sanitized_parts = [_sanitize(part) for part in rel.parts]
             dest_path = images_dir.joinpath(*sanitized_parts)
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            # copy file (overwrite if exists)
             shutil.copy2(src, dest_path)
             img["full"] = "images/" + "/".join(sanitized_parts)
         except Exception as e:
             print(f"copy error for {src}: {e}")
 
-    # group images by top-level directory for template (order newest-first)
+    # grouping
     from collections import defaultdict
     groups_map = defaultdict(list)
     for img in images:
@@ -194,14 +194,12 @@ def main():
         top = parts[0] if parts else ""
         groups_map[top].append(img)
 
-    # sort groups by name descending (timestamps sort lexicographically)
     group_names = sorted(groups_map.keys(), reverse=True)
     groups = [{"name": n, "images": groups_map[n]} for n in group_names]
 
-    # timestamp for when the index/site was generated
     rebuilt = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-    # render template
+    # render into tmp
     if Environment is None:
         print("Jinja2 not installed; cannot render site")
         return 1
@@ -209,15 +207,57 @@ def main():
     env = Environment(loader=FileSystemLoader(str(templates_path)))
     tpl = env.get_template("index.html")
     rendered = tpl.render(groups=groups, count=len(images), rebuilt=rebuilt)
-    (out / "index.html").write_text(rendered, encoding="utf-8")
-    # copy static assets
+    (out_tmp / "index.html").write_text(rendered, encoding="utf-8")
+
+    # copy static
     static_src = templates_path / "static"
-    static_dst = out / "static"
+    static_dst = out_tmp / "static"
     if static_src.exists():
         for p in static_src.iterdir():
             content = p.read_bytes()
             (static_dst).mkdir(parents=True, exist_ok=True)
             (static_dst / p.name).write_bytes(content)
+
+    # atomic swap
+    try:
+        backup = out.parent / (out.name + ".old")
+        if backup.exists():
+            try:
+                shutil.rmtree(backup)
+            except Exception:
+                pass
+        if out.exists():
+            out.rename(backup)
+        out_tmp.rename(out)
+        if backup.exists():
+            try:
+                shutil.rmtree(backup)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"warning: atomic swap failed: {e}")
+        print("Attempting fallback copy into existing output directory...")
+        try:
+            out.mkdir(parents=True, exist_ok=True)
+            for item in out_tmp.iterdir():
+                dest = out / item.name
+                if item.is_dir():
+                    # copy tree, overwrite existing
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+            # remove tmp after successful copy
+            try:
+                shutil.rmtree(out_tmp)
+            except Exception:
+                pass
+            print(f"Generated site at {out} (copied from tmp)")
+            return 0
+        except Exception as e2:
+            print(f"fallback copy failed: {e2}")
+            print(f"Generated site at {out_tmp} (not swapped)")
+            return 0
+
     print(f"Generated site at {out}")
     return 0
 
