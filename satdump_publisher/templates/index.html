@@ -3,23 +3,31 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>SatDump Publisher - Gallery</title>
+    <title>DrewSat GOES Images</title>
     <link rel="stylesheet" href="static/style.css">
   </head>
   <body>
     <header>
-      <h1>SatDump Publisher - Gallery</h1>
-      <p>Found {{ images|length }} image(s)</p>
+      <h1>DrewSat GOES Images</h1>
+      <p>Found {{ count }} image(s)</p>
+      <p class="rebuilt">Index rebuilt: {{ rebuilt }}</p>
     </header>
     <main>
-      <ul class="gallery">
-      {% for img in images %}
-        <li>
-          <a href="{{ img.full }}"><img alt="{{ img.path }}" src="thumbs/{{ loop.index0 }}.jpg"></a>
-          <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
-        </li>
+      {% for group in groups %}
+      <section class="group">
+        <details {% if loop.first %}open{% endif %}>
+          <summary>{{ group.name }} ({{ group.images|length }} image(s))</summary>
+          <ul class="gallery">
+          {% for img in group.images %}
+            <li>
+              <a href="{{ img.full }}"><img alt="{{ img.path }}" src="thumbs/{{ img.idx }}.jpg"></a>
+              <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
+            </li>
+          {% endfor %}
+          </ul>
+        </details>
+      </section>
       {% endfor %}
-      </ul>
     </main>
   </body>
 </html>

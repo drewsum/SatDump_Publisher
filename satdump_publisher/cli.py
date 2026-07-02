@@ -139,6 +139,10 @@ def main():
             "sha256": r[6],
         })
     out.mkdir(parents=True, exist_ok=True)
+    # assign stable thumbnail index for each image
+    for i, img in enumerate(images):
+        img["idx"] = i
+
     # thumbnails
     if not args.no_thumbs:
         thumbs_dir = out / "thumbs"
@@ -182,6 +186,21 @@ def main():
         except Exception as e:
             print(f"copy error for {src}: {e}")
 
+    # group images by top-level directory for template (order newest-first)
+    from collections import defaultdict
+    groups_map = defaultdict(list)
+    for img in images:
+        parts = Path(img["path"]).parts
+        top = parts[0] if parts else ""
+        groups_map[top].append(img)
+
+    # sort groups by name descending (timestamps sort lexicographically)
+    group_names = sorted(groups_map.keys(), reverse=True)
+    groups = [{"name": n, "images": groups_map[n]} for n in group_names]
+
+    # timestamp for when the index/site was generated
+    rebuilt = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
     # render template
     if Environment is None:
         print("Jinja2 not installed; cannot render site")
@@ -189,7 +208,7 @@ def main():
     templates_path = Path(__file__).resolve().parent / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_path)))
     tpl = env.get_template("index.html")
-    rendered = tpl.render(images=images)
+    rendered = tpl.render(groups=groups, count=len(images), rebuilt=rebuilt)
     (out / "index.html").write_text(rendered, encoding="utf-8")
     # copy static assets
     static_src = templates_path / "static"
