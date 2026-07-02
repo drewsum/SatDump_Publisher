@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import os
 import shutil
+from urllib.parse import quote
 import time
 from typing import List
 
@@ -154,18 +155,30 @@ def main():
                 except Exception as e:
                     print(f"thumb error for {src}: {e}")
 
-    # copy original images into site so nginx can serve them from the www tree
+    # copy original images into site preserving relative paths so nginx can serve them
     images_dir = out / "images"
-    images_dir.mkdir(exist_ok=True)
+    # remove any stale copies to ensure sanitized set is authoritative
+    if images_dir.exists():
+        try:
+            shutil.rmtree(images_dir)
+        except Exception as e:
+            print(f"warning: could not remove existing images dir: {e}")
+    images_dir.mkdir(parents=True, exist_ok=True)
     for idx, img in enumerate(images):
         src = root / img["path"]
         try:
-            ext = Path(img["path"]).suffix or ""
-            dest_name = f"{idx}{ext.lower()}"
-            dest_path = images_dir / dest_name
+            rel = Path(img["path"])  # may include subdirs
+            # sanitize each path segment to safe filename characters
+            import re
+            def _sanitize(segment: str) -> str:
+                return re.sub(r'[^A-Za-z0-9._-]', '_', segment)
+
+            sanitized_parts = [_sanitize(part) for part in rel.parts]
+            dest_path = images_dir.joinpath(*sanitized_parts)
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
             # copy file (overwrite if exists)
             shutil.copy2(src, dest_path)
-            img["full"] = f"images/{dest_name}"
+            img["full"] = "images/" + "/".join(sanitized_parts)
         except Exception as e:
             print(f"copy error for {src}: {e}")
 
