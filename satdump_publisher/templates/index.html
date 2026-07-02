@@ -13,6 +13,7 @@
       <p class="rebuilt">Index rebuilt: {{ rebuilt }}</p>
     </header>
     <main>
+      <div class="container">
       {% for group in groups %}
       <section class="group">
         <details {% if loop.first %}open{% endif %}>
@@ -20,14 +21,17 @@
           <ul class="gallery">
           {% for img in group.images %}
             <li>
-              <a href="{{ img.full }}"><img alt="{{ img.path }}" src="thumbs/{{ img.idx }}.jpg"></a>
-              <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
+              <div class="card">
+                <a href="{{ img.full }}"><img alt="{{ img.path }}" src="thumbs/{{ img.idx }}.jpg"></a>
+                <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
+              </div>
             </li>
           {% endfor %}
           </ul>
         </details>
       </section>
       {% endfor %}
+      </div>
     </main>
   </body>
 </html>
