@@ -15,7 +15,7 @@
       <ul class="gallery">
       {% for img in images %}
         <li>
-          <a href="{{ img.path }}"><img alt="{{ img.path }}" src="thumbs/{{ loop.index0 }}.jpg"></a>
+          <a href="{{ img.full }}"><img alt="{{ img.path }}" src="thumbs/{{ loop.index0 }}.jpg"></a>
           <div class="meta">{{ img.timestamp }} — {{ img.format }} {{ img.width }}x{{ img.height }}</div>
         </li>
       {% endfor %}

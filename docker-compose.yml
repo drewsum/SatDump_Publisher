@@ -10,3 +10,13 @@ services:
       - ./output:/data
     command: ["satdump_publisher"]
     restart: "no"
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./output/www:/usr/share/nginx/html:ro
+    depends_on:
+      - satdump-publisher
+    restart: "unless-stopped"

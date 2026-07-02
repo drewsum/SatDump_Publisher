@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import os
+import shutil
 import time
 from typing import List
 
@@ -152,6 +153,21 @@ def main():
                         im.convert("RGB").save(thumbs_dir / f"{idx}.jpg", format="JPEG")
                 except Exception as e:
                     print(f"thumb error for {src}: {e}")
+
+    # copy original images into site so nginx can serve them from the www tree
+    images_dir = out / "images"
+    images_dir.mkdir(exist_ok=True)
+    for idx, img in enumerate(images):
+        src = root / img["path"]
+        try:
+            ext = Path(img["path"]).suffix or ""
+            dest_name = f"{idx}{ext.lower()}"
+            dest_path = images_dir / dest_name
+            # copy file (overwrite if exists)
+            shutil.copy2(src, dest_path)
+            img["full"] = f"images/{dest_name}"
+        except Exception as e:
+            print(f"copy error for {src}: {e}")
 
     # render template
     if Environment is None:
