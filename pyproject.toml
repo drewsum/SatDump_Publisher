@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61","wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satdump-publisher"
+version = "0.1.0"
+description = "Minimal satdump publisher CLI"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{name = "Drew Maatman"}]
+
+[project.scripts]
+satdump_publisher = "satdump_publisher.cli:main"

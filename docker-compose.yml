@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  publisher:
+    build: .
+    image: satdump-publisher:local
+    volumes:
+      - ./data:/data
+    command: ["satdump_publisher", "--message", "Hello from docker-compose"]
+    restart: "no"
+
+# Example with a named volume instead of host bind:
+# volumes:
+#   - publisher-data:/data
+
+#volumes:
+#  publisher-data:
+  
